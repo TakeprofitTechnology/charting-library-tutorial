@@ -1,0 +1,4 @@
+* @Jukerony @YuriySavlukov
+**/*.csproj
+**/Const.h
+**/version.h
