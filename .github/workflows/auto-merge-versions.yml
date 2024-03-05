@@ -1,0 +1,50 @@
+name: Auto Merge Version PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  check_run:
+    types: [completed]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # Necessary to get all git history for path checks
+
+    - name: 'Get Changed Files'
+      id: files
+      uses: jitterbit/get-changed-files@v1
+      continue-on-error: true
+
+    - name: 'Check PR title'
+      uses: actions-ecosystem/action-regex-match@v2
+      id: regex-match
+      with:
+        text: ${{ github.event.pull_request.title }}
+        regex: '[\s\S]+v\s*\d+\.\d+(\.\d+(\.\d+(\.\d+)?)?)?'
+
+    - name: Check if only specified files are modified
+      id: check-files
+      run: |
+        FILES="${{ steps.files.outputs.all }}"
+        for FILE in $FILES; do
+          if [[ "$FILE" != *".csproj" && "$FILE" != *"Const.h" && "$FILE" != *"version.h" ]]; then
+            echo "Detected changes in files outside the specified patterns."
+            echo "::set-output name=only_specified::false"
+            exit 0
+          fi
+        done
+        echo "::set-output name=only_specified::true"
+
+    - name: Auto Merge
+      if: steps.regex-match.outputs.match != '' && steps.check-files.outputs.only_specified == 'true'
+      id: automerge
+      uses: "pascalgn/automerge-action@v0.16.2"
+      env:
+        GITHUB_TOKEN: "${{ secrets.AUTO_MERGE_TOKEN }}"
+        LOG: "TRACE"
+        MERGE_LABELS: ""
