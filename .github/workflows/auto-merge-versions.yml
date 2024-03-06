@@ -13,7 +13,8 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 0 # Necessary to get all git history for path checks
+        ref: ${{ github.event.pull_request.base.ref }}
+        token: ${{ secrets.AUTO_MERGE_TOKEN }}
 
     - name: 'Get Changed Files'
       id: files
@@ -39,12 +40,20 @@ jobs:
           fi
         done
         echo "::set-output name=only_specified::true"
-
-    - name: Auto Merge
+      
+    - name: Merge branch into master
       if: steps.regex-match.outputs.match != '' && steps.check-files.outputs.only_specified == 'true'
-      id: automerge
-      uses: "pascalgn/automerge-action@v0.16.2"
-      env:
-        GITHUB_TOKEN: "${{ secrets.AUTO_MERGE_TOKEN }}"
-        LOG: "TRACE"
-        MERGE_LABELS: ""
+      run: |
+        git config --global user.email "sysadmin@takeprofittech.com"
+        git config --global user.name "takeprofittechbot"
+        git remote update
+        git fetch 
+        git checkout --track origin/${{ github.event.pull_request.head.ref }}
+        git checkout master
+        echo "After checkout, before merge"
+        git merge ${{ github.event.pull_request.head.ref }} --no-ff -m "Merge dev-version into master"
+        echo "After merge, before push"
+        git push origin ${{ github.event.pull_request.base.ref }} --force
+        echo "After push, before deletion"
+        git push origin --delete ${{ github.event.pull_request.head.ref }} --force
+        echo "After deletion, done"
